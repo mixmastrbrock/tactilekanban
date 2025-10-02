@@ -1,0 +1,51 @@
+name: Build macOS Container
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  release:
+    types: [published]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-push-macos:
+    runs-on: macos-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Podman
+        run: |
+          brew install podman
+          podman machine init
+          podman machine start
+
+      - name: Log in to the Container registry
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | \
+            podman login ${{ env.REGISTRY }} \
+            -u ${{ github.actor }} --password-stdin
+
+      - name: Build container image
+        run: |
+          podman build \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:macos-${{ github.sha }} \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:macos-latest .
+
+      - name: Push container image
+        run: |
+          podman push \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:macos-${{ github.sha }}
+          podman push \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:macos-latest
